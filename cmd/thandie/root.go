@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/ThandieOps/thandie-agent/internal/config"
+	"github.com/ThandieOps/thandie-agent/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -99,6 +100,8 @@ func initConfig() {
 	viper.SetDefault("scanner.ignore_dirs", []string{".git", "node_modules", "vendor"})
 	viper.SetDefault("scanner.max_depth", 1)
 	viper.SetDefault("logging.level", "info")
+	viper.SetDefault("logging.to_file", false)
+	viper.SetDefault("logging.json", false)
 
 	// Read config file (if it exists)
 	if err := viper.ReadInConfig(); err != nil {
@@ -125,9 +128,33 @@ func initConfig() {
 				MaxDepth:      1,
 			},
 			Logging: config.LoggingConfig{
-				Level: "info",
+				Level:  "info",
+				ToFile: false,
+				JSON:   false,
 			},
 		}
+	}
+
+	// Initialize logger from config
+	if cfg != nil {
+		if err := logger.Init(cfg.Logging.Level, cfg.Logging.JSON, cfg.Logging.ToFile); err != nil {
+			// Log error but don't fail - continue with stderr logging
+			logPath, pathErr := logger.GetLogFilePath()
+			if pathErr == nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to initialize file logging (log path: %s): %v\n", logPath, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "Warning: failed to initialize file logging: %v\n", err)
+			}
+			logger.Init(cfg.Logging.Level, cfg.Logging.JSON, false) // Fallback to stderr only
+		} else if cfg.Logging.ToFile {
+			// Log successful file logging initialization (only if enabled)
+			logPath, err := logger.GetLogFilePath()
+			if err == nil {
+				logger.Debug("file logging enabled", "path", logPath)
+			}
+		}
+	} else {
+		logger.Init("info", false, false) // default: info level, text format, no file
 	}
 }
 

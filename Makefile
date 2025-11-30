@@ -5,6 +5,7 @@ BINARY_NAME=thandie
 BUILD_DIR=./bin
 CMD_PATH=./cmd/thandie
 WORKSPACE=~/Workspace
+LOG_FILE=~/Library/Caches/thandie/logs/thandie.log
 CMD=scan
 
 # Default target
@@ -31,6 +32,9 @@ build: fmt
 execute: build
 	@echo "# Executing $(BINARY_NAME)..."
 	$(BUILD_DIR)/$(BINARY_NAME) $(CMD) --workspace $(WORKSPACE)
+
+logs:
+	cat $(LOG_FILE)
 
 # Clean build artifacts
 clean:

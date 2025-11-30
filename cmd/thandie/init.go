@@ -85,7 +85,9 @@ func runInit() error {
 			MaxDepth:      1,
 		},
 		Logging: config.LoggingConfig{
-			Level: "info",
+			Level:  "info",
+			ToFile: false,
+			JSON:   false,
 		},
 	}
 

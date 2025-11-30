@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"os"
 
+	"github.com/ThandieOps/thandie-agent/internal/logger"
 	"github.com/ThandieOps/thandie-agent/internal/scanner"
 	"github.com/spf13/cobra"
 )
@@ -18,12 +19,15 @@ top-level project folders found there.`,
 		// Resolve workspace path using precedence: flag > env > config > default
 		wsPath := getWorkspacePath()
 		if wsPath == "" {
-			log.Fatal("workspace path is empty; use --workspace or -w to specify it")
+			logger.Error("workspace path is empty", "hint", "use --workspace or -w to specify it")
+			os.Exit(1)
 		}
 
+		logger.Debug("scanning workspace", "path", wsPath)
 		dirs, err := scanner.ListTopLevelDirs(wsPath)
 		if err != nil {
-			log.Fatalf("failed to scan workspace: %v", err)
+			logger.Error("failed to scan workspace", "error", err, "path", wsPath)
+			os.Exit(1)
 		}
 
 		if len(dirs) == 0 {

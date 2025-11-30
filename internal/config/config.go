@@ -30,5 +30,7 @@ type ScannerConfig struct {
 
 // LoggingConfig holds logging-related settings
 type LoggingConfig struct {
-	Level string `mapstructure:"level" yaml:"level"`
+	Level  string `mapstructure:"level" yaml:"level"`
+	ToFile bool   `mapstructure:"to_file" yaml:"to_file"`
+	JSON   bool   `mapstructure:"json" yaml:"json"`
 }
