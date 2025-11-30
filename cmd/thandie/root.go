@@ -24,6 +24,18 @@ and syncing their state with a remote service.`,
 
 // Execute is called by main.main()
 func Execute() {
+	// Remove duplicate help commands that Cobra may add during execution
+	// We keep only our custom help command (identified by the "custom" annotation)
+	cmds := rootCmd.Commands()
+	for _, c := range cmds {
+		if c.Use == "help [command]" || c.Use == "help" {
+			// Check if this is our custom help command by looking for the annotation
+			if c.Annotations == nil || c.Annotations["custom"] != "true" {
+				rootCmd.RemoveCommand(c)
+			}
+		}
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
