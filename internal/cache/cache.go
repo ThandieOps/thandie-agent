@@ -8,14 +8,17 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/ThandieOps/thandie-agent/internal/scanner"
 )
 
 // ScanResult represents the cached results of a workspace scan
 type ScanResult struct {
-	WorkspacePath string    `json:"workspace_path"`
-	ScannedAt     time.Time `json:"scanned_at"`
-	Directories   []string  `json:"directories"`
-	Count         int       `json:"count"`
+	WorkspacePath  string                  `json:"workspace_path"`
+	ScannedAt      time.Time               `json:"scanned_at"`
+	Directories    []string                `json:"directories"` // Deprecated: use DirectoryInfos instead
+	Count          int                     `json:"count"`
+	DirectoryInfos []scanner.DirectoryInfo `json:"directory_infos"`
 }
 
 // Cache manages scan result caching
@@ -56,12 +59,30 @@ func getCacheDir() (string, error) {
 }
 
 // SaveScanResult saves scan results to the cache
+// This method is deprecated in favor of SaveScanResultWithMetadata
 func (c *Cache) SaveScanResult(workspacePath string, directories []string) error {
+	// Convert directories to DirectoryInfos
+	infos := make([]scanner.DirectoryInfo, len(directories))
+	for i, dir := range directories {
+		infos[i] = scanner.DirectoryInfo{Path: dir}
+	}
+	return c.SaveScanResultWithMetadata(workspacePath, infos)
+}
+
+// SaveScanResultWithMetadata saves scan results with metadata to the cache
+func (c *Cache) SaveScanResultWithMetadata(workspacePath string, directoryInfos []scanner.DirectoryInfo) error {
+	// Extract directory paths for backward compatibility
+	directories := make([]string, len(directoryInfos))
+	for i, info := range directoryInfos {
+		directories[i] = info.Path
+	}
+
 	result := ScanResult{
-		WorkspacePath: workspacePath,
-		ScannedAt:     time.Now(),
-		Directories:   directories,
-		Count:         len(directories),
+		WorkspacePath:  workspacePath,
+		ScannedAt:      time.Now(),
+		Directories:    directories, // Keep for backward compatibility
+		Count:          len(directoryInfos),
+		DirectoryInfos: directoryInfos,
 	}
 
 	// Create a safe filename from workspace path (hash or sanitize)

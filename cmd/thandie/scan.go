@@ -56,35 +56,44 @@ top-level project folders found there.`,
 			"ignore_dirs", ignoreDirs,
 			"include_hidden", includeHidden)
 
-		dirs, err := scanner.ListTopLevelDirs(wsPath, ignoreDirs, includeHidden)
+		// Scan directories with metadata collection
+		dirInfos, err := scanner.ScanDirectoriesWithMetadata(wsPath, ignoreDirs, includeHidden)
 		if err != nil {
 			logger.Error("failed to scan workspace", "error", err, "path", wsPath)
 			os.Exit(1)
 		}
 
-		logger.Info("scan completed", "directories_found", len(dirs))
+		logger.Info("scan completed", "directories_found", len(dirInfos))
 
-		// Save scan results to cache
+		// Save scan results with metadata to cache
 		cacheInstance, err := cache.New()
 		if err != nil {
 			logger.Warn("failed to initialize cache", "error", err)
 		} else {
-			if err := cacheInstance.SaveScanResult(wsPath, dirs); err != nil {
+			if err := cacheInstance.SaveScanResultWithMetadata(wsPath, dirInfos); err != nil {
 				logger.Warn("failed to save scan results to cache", "error", err)
 			} else {
-				logger.Info("scan results cached", "count", len(dirs), "cache_dir", cacheInstance.GetCacheDir())
-				logger.Debug("scan results cached", "count", len(dirs), "cache_dir", cacheInstance.GetCacheDir())
+				logger.Info("scan results cached", "count", len(dirInfos), "cache_dir", cacheInstance.GetCacheDir())
+				logger.Debug("scan results cached", "count", len(dirInfos), "cache_dir", cacheInstance.GetCacheDir())
 			}
 		}
 
-		if len(dirs) == 0 {
+		if len(dirInfos) == 0 {
 			fmt.Printf("No top-level directories found in %s\n", wsPath)
 			return
 		}
 
 		fmt.Printf("Top-level directories in %s:\n", wsPath)
-		for _, d := range dirs {
-			fmt.Println(" -", d)
+		for _, info := range dirInfos {
+			output := " - " + info.Path
+			if info.GitMetadata != nil && info.GitMetadata.IsGitRepo {
+				output += " [git: " + info.GitMetadata.CurrentBranch
+				if info.GitMetadata.HasUncommitted {
+					output += " *"
+				}
+				output += "]"
+			}
+			fmt.Println(output)
 		}
 	},
 }

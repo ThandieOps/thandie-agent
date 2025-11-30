@@ -30,12 +30,22 @@ build: fmt
 	@echo "# Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
 # Execute the built binary
+scan: build
+	@echo "# Executing $(BINARY_NAME)..."
+	$(BUILD_DIR)/$(BINARY_NAME) scan --workspace $(WORKSPACE)
+
+# Execute the built binary
 execute: build
 	@echo "# Executing $(BINARY_NAME)..."
 	$(BUILD_DIR)/$(BINARY_NAME) $(CMD) --workspace $(WORKSPACE)
 
 logs:
 	cat $(LOG_FILE)
+	wc -l $(LOG_FILE)
+
+cache:
+	ls -lah $(CACHE_DIR)
+	cat $(CACHE_DIR)/*.json | jq '.'
 
 # Clean build artifacts
 clean:

@@ -1,9 +1,12 @@
 package scanner
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-git/go-git/v5"
 )
 
 // ListTopLevelDirs scans a directory and returns top-level directories,
@@ -41,4 +44,134 @@ func ListTopLevelDirs(path string, ignoreDirs []string, includeHidden bool) ([]s
 		dirs = append(dirs, filepath.Join(path, dirName))
 	}
 	return dirs, nil
+}
+
+// GitMetadata represents git repository metadata for a directory
+type GitMetadata struct {
+	IsGitRepo      bool   `json:"is_git_repo"`
+	RemoteURL      string `json:"remote_url,omitempty"`
+	CurrentBranch  string `json:"current_branch,omitempty"`
+	HasUncommitted bool   `json:"has_uncommitted,omitempty"`
+	StatusSummary  string `json:"status_summary,omitempty"`
+}
+
+// IsGitRepository checks if a directory contains a git repository
+func IsGitRepository(dirPath string) bool {
+	gitDir := filepath.Join(dirPath, ".git")
+	info, err := os.Stat(gitDir)
+	return err == nil && info.IsDir()
+}
+
+// CollectGitMetadata collects git metadata for a directory using go-git
+// Returns metadata with IsGitRepo=false if the directory is not a git repository
+func CollectGitMetadata(dirPath string) (*GitMetadata, error) {
+	// Try to open the repository using go-git
+	repo, err := git.PlainOpen(dirPath)
+	if err != nil {
+		// Not a git repository or can't be opened
+		return &GitMetadata{IsGitRepo: false}, nil
+	}
+
+	metadata := &GitMetadata{
+		IsGitRepo: true,
+	}
+
+	// Get remote URL (prefer origin)
+	remotes, err := repo.Remotes()
+	if err == nil {
+		for _, remote := range remotes {
+			if remote.Config().Name == "origin" {
+				urls := remote.Config().URLs
+				if len(urls) > 0 {
+					metadata.RemoteURL = urls[0]
+					break
+				}
+			}
+		}
+		// If no origin found, use the first remote
+		if metadata.RemoteURL == "" && len(remotes) > 0 {
+			urls := remotes[0].Config().URLs
+			if len(urls) > 0 {
+				metadata.RemoteURL = urls[0]
+			}
+		}
+	}
+
+	// Get current branch
+	head, err := repo.Head()
+	if err == nil {
+		metadata.CurrentBranch = head.Name().Short()
+	}
+
+	// Get git status (uncommitted changes)
+	worktree, err := repo.Worktree()
+	if err == nil {
+		status, err := worktree.Status()
+		if err == nil {
+			metadata.HasUncommitted = !status.IsClean()
+
+			// Build status summary similar to git status --porcelain format
+			if !status.IsClean() {
+				var statusLines []string
+				count := 0
+				for file, fileStatus := range status {
+					if count >= 5 {
+						break
+					}
+					// Format: XY filename (X = index status, Y = worktree status)
+					// StatusCode.String() returns the single character code
+					stagingCode := string(fileStatus.Staging)
+					worktreeCode := string(fileStatus.Worktree)
+					statusLine := fmt.Sprintf("%s%s %s", stagingCode, worktreeCode, file)
+					statusLines = append(statusLines, statusLine)
+					count++
+				}
+
+				if len(statusLines) > 0 {
+					metadata.StatusSummary = strings.Join(statusLines, "; ")
+					totalFiles := len(status)
+					if totalFiles > 5 {
+						metadata.StatusSummary += fmt.Sprintf(" ... (%d more)", totalFiles-5)
+					}
+				} else {
+					metadata.StatusSummary = "clean"
+				}
+			} else {
+				metadata.StatusSummary = "clean"
+			}
+		}
+	}
+
+	return metadata, nil
+}
+
+// DirectoryInfo represents metadata about a directory
+type DirectoryInfo struct {
+	Path        string       `json:"path"`
+	GitMetadata *GitMetadata `json:"git_metadata,omitempty"`
+}
+
+// ScanDirectoriesWithMetadata scans a directory and returns top-level directories
+// with their git metadata, respecting the provided scanner configuration
+func ScanDirectoriesWithMetadata(path string, ignoreDirs []string, includeHidden bool) ([]DirectoryInfo, error) {
+	dirs, err := ListTopLevelDirs(path, ignoreDirs, includeHidden)
+	if err != nil {
+		return nil, err
+	}
+
+	infos := make([]DirectoryInfo, len(dirs))
+	for i, dir := range dirs {
+		gitMetadata, err := CollectGitMetadata(dir)
+		if err != nil {
+			// If metadata collection fails, still include the directory but without metadata
+			infos[i] = DirectoryInfo{Path: dir}
+			continue
+		}
+		infos[i] = DirectoryInfo{
+			Path:        dir,
+			GitMetadata: gitMetadata,
+		}
+	}
+
+	return infos, nil
 }
