@@ -35,6 +35,10 @@ scan: build
 	@echo "# Executing $(BINARY_NAME)..."
 	$(BUILD_DIR)/$(BINARY_NAME) scan --workspace $(WORKSPACE)
 
+tui:
+	@echo "# Executing $(BINARY_NAME) in TUI mode..."
+	$(BUILD_DIR)/$(BINARY_NAME)
+
 # Execute the built binary
 execute: build
 	@echo "# Executing $(BINARY_NAME)..."
@@ -54,7 +58,7 @@ cache:
 # Clean build artifacts
 clean:
 	@echo "# Cleaning build artifacts..."
-	/bin/rm ./thandie
+	/bin/rm -vf ./thandie
 	/bin/rm -rvf $(BUILD_DIR)
 	@echo "# Clean complete"
 
