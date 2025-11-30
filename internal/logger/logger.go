@@ -94,6 +94,14 @@ func GetLogFilePath() (string, error) {
 	return getLogFilePath()
 }
 
+// Sync flushes the log file to disk if it was opened
+func Sync() error {
+	if logFile != nil {
+		return logFile.Sync()
+	}
+	return nil
+}
+
 // Close closes the log file if it was opened
 func Close() error {
 	if logFile != nil {

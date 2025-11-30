@@ -6,6 +6,7 @@ BUILD_DIR=./bin
 CMD_PATH=./cmd/thandie
 WORKSPACE=~/Workspace
 LOG_FILE=~/Library/Caches/thandie/logs/thandie.log
+CACHE_DIR= ~/Library/Caches/thandie/cache/
 CMD=scan
 
 # Default target

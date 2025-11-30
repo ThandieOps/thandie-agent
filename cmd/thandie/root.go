@@ -90,8 +90,8 @@ func initConfig() {
 	// Set environment variable prefix
 	viper.SetEnvPrefix("THANDIE")
 	viper.AutomaticEnv() // Automatically read environment variables with THANDIE_ prefix
-	// Map THANDIE_WORKSPACE to workspace key
-	viper.BindEnv("workspace", "THANDIE_WORKSPACE")
+	// Map THANDIE_WORKSPACE to workspace.default (not workspace itself, to avoid conflict with nested structure)
+	viper.BindEnv("workspace.default", "THANDIE_WORKSPACE")
 
 	// Set defaults
 	viper.SetDefault("version", 1)
@@ -115,24 +115,37 @@ func initConfig() {
 	// Unmarshal config into struct
 	cfg = &config.Config{}
 	if err := viper.Unmarshal(cfg); err != nil {
-		// If unmarshaling fails, create a default config
+		// If unmarshaling fails, try to read values directly from Viper
+		fmt.Fprintf(os.Stderr, "Warning: failed to unmarshal config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Attempting to read config values directly from Viper...\n")
+
+		// Build config from Viper values directly
 		cfg = &config.Config{
-			Version: 1,
+			Version: viper.GetInt("version"),
 			Workspace: config.WorkspaceConfig{
-				Default:  "",
-				Profiles: []config.WorkspaceProfile{},
+				Default:  viper.GetString("workspace.default"),
+				Profiles: []config.WorkspaceProfile{}, // Profiles parsing might be complex, skip for now
 			},
 			Scanner: config.ScannerConfig{
-				IncludeHidden: false,
-				IgnoreDirs:    []string{".git", "node_modules", "vendor"},
-				MaxDepth:      1,
+				IncludeHidden: viper.GetBool("scanner.include_hidden"),
+				IgnoreDirs:    viper.GetStringSlice("scanner.ignore_dirs"),
+				MaxDepth:      viper.GetInt("scanner.max_depth"),
 			},
 			Logging: config.LoggingConfig{
-				Level:  "info",
-				ToFile: false,
-				JSON:   false,
+				Level:  viper.GetString("logging.level"),
+				ToFile: viper.GetBool("logging.to_file"),
+				JSON:   viper.GetBool("logging.json"),
 			},
 		}
+		fmt.Fprintf(os.Stderr, "Config loaded from Viper directly - Logging.ToFile=%v\n", cfg.Logging.ToFile)
+	}
+
+	// Debug: Print config values to stderr before logger init (for debugging)
+	// This helps verify config is being read correctly
+	if cfg != nil {
+		fmt.Fprintf(os.Stderr, "DEBUG: Config loaded - Logging.ToFile=%v, Logging.Level=%s\n", cfg.Logging.ToFile, cfg.Logging.Level)
+		// Also check what Viper has directly
+		fmt.Fprintf(os.Stderr, "DEBUG: Viper logging.to_file=%v\n", viper.GetBool("logging.to_file"))
 	}
 
 	// Initialize logger from config
@@ -141,17 +154,21 @@ func initConfig() {
 			// Log error but don't fail - continue with stderr logging
 			logPath, pathErr := logger.GetLogFilePath()
 			if pathErr == nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to initialize file logging (log path: %s): %v\n", logPath, err)
+				fmt.Fprintf(os.Stderr, "ERROR: failed to initialize file logging (log path: %s): %v\n", logPath, err)
 			} else {
-				fmt.Fprintf(os.Stderr, "Warning: failed to initialize file logging: %v\n", err)
+				fmt.Fprintf(os.Stderr, "ERROR: failed to initialize file logging: %v\n", err)
 			}
 			logger.Init(cfg.Logging.Level, cfg.Logging.JSON, false) // Fallback to stderr only
 		} else if cfg.Logging.ToFile {
 			// Log successful file logging initialization (only if enabled)
 			logPath, err := logger.GetLogFilePath()
 			if err == nil {
-				logger.Debug("file logging enabled", "path", logPath)
+				fmt.Fprintf(os.Stderr, "INFO: File logging enabled - log path: %s\n", logPath)
+				// Now that logger is initialized, also log it
+				logger.Info("file logging enabled", "path", logPath)
 			}
+		} else {
+			fmt.Fprintf(os.Stderr, "DEBUG: File logging is disabled (to_file=false)\n")
 		}
 	} else {
 		logger.Init("info", false, false) // default: info level, text format, no file
