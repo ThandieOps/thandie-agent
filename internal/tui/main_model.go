@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ThandieOps/thandie-agent/internal/cache"
 	"github.com/ThandieOps/thandie-agent/internal/scanner"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,6 +37,9 @@ func (d DirectoryItem) Description() string {
 	return "" // We only show the directory name
 }
 
+// ScanTriggeredMsg is sent when a scan completes and cache should be reloaded
+type ScanTriggeredMsg struct{}
+
 // MainModel represents the main TUI state
 type MainModel struct {
 	workspacePath string
@@ -46,10 +50,12 @@ type MainModel struct {
 	height        int
 	leftWidth     int
 	rightWidth    int
+	ignoreDirs    []string
+	includeHidden bool
 }
 
 // NewMainModel creates a new main TUI model
-func NewMainModel(workspacePath string, directories []scanner.DirectoryInfo) MainModel {
+func NewMainModel(workspacePath string, directories []scanner.DirectoryInfo, ignoreDirs []string, includeHidden bool) MainModel {
 	// Create list items from directories
 	items := make([]list.Item, len(directories))
 	for i, dir := range directories {
@@ -76,6 +82,8 @@ func NewMainModel(workspacePath string, directories []scanner.DirectoryInfo) Mai
 		height:        24,
 		leftWidth:     40,
 		rightWidth:    40,
+		ignoreDirs:    ignoreDirs,
+		includeHidden: includeHidden,
 	}
 
 	// Set initial selection if directories exist
@@ -109,18 +117,25 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			listWidth = 10
 		}
 		m.list.SetWidth(listWidth)
-		// List height: full height minus header (3 lines: 1 content + 2 border) and spacing (1) and help (1)
-		listHeight := msg.Height - 5
+		// List height: full height minus header (1 line) and spacing (1) and help
+		listHeight := msg.Height - 3
 		if listHeight < 5 {
 			listHeight = 5
 		}
 		m.list.SetHeight(listHeight)
+		// Ensure list selection is valid after resize
+		if m.selectedIndex >= 0 && m.selectedIndex < len(m.directories) {
+			m.list.Select(m.selectedIndex)
+		}
 		return m, nil
 
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "s":
+			// Trigger scan
+			return m, m.runScan()
 		case "enter":
 			// Update selected index based on list selection
 			if selected := m.list.SelectedItem(); selected != nil {
@@ -134,6 +149,38 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		// Pass other key messages to the list (for filtering, etc.)
+		// Fall through to list.Update below
+
+	case tea.MouseMsg:
+		// Pass mouse messages to the list for scrolling and selection
+		// The list component handles mouse clicks and wheel scrolling automatically
+		// Fall through to list.Update below
+
+	case ScanTriggeredMsg:
+		// Reload cache after scan completes
+		return m, m.reloadCache()
+
+	case CacheReloadedMsg:
+		// Update directories with new scan results
+		m.directories = msg.Directories
+		// Rebuild list items
+		items := make([]list.Item, len(m.directories))
+		for i, dir := range m.directories {
+			items[i] = DirectoryItem{Info: dir}
+		}
+		// Create new list with updated items
+		m.list.SetItems(items)
+		// Reset selection
+		if len(m.directories) > 0 {
+			m.selectedIndex = 0
+			// Select the first item in the list
+			m.list.Select(0)
+		} else {
+			m.selectedIndex = -1
+		}
+		// Force a window size refresh to ensure full screen redraw
+		return m, tea.WindowSize()
 	}
 
 	// Update list
@@ -332,6 +379,45 @@ func parseStatusSummary(summary string) ([]string, string) {
 	}
 
 	return files, moreText
+}
+
+// runScan runs the scan operation and returns a command that sends ScanTriggeredMsg when done
+func (m MainModel) runScan() tea.Cmd {
+	return func() tea.Msg {
+		// Run scan with TUI (this will show the progress bar)
+		dirInfos, err := RunScanWithTUI(m.workspacePath, m.ignoreDirs, m.includeHidden)
+		if err != nil {
+			// Return error message - we could handle this better in the future
+			return ScanTriggeredMsg{} // Still reload cache even on error
+		}
+
+		// Scan completed successfully, signal to reload cache
+		_ = dirInfos // Results are already saved to cache by RunScanWithTUI
+		return ScanTriggeredMsg{}
+	}
+}
+
+// reloadCache reloads the cache and updates the directory list
+func (m MainModel) reloadCache() tea.Cmd {
+	return func() tea.Msg {
+		cacheInstance, err := cache.New()
+		if err != nil {
+			return nil // Silently fail - cache might not be available
+		}
+
+		scanResult, err := cacheInstance.LoadScanResult(m.workspacePath)
+		if err != nil {
+			return nil // Silently fail - no cached results
+		}
+
+		// Return a message with the new directories
+		return CacheReloadedMsg{Directories: scanResult.DirectoryInfos}
+	}
+}
+
+// CacheReloadedMsg is sent when cache is reloaded with new directories
+type CacheReloadedMsg struct {
+	Directories []scanner.DirectoryInfo
 }
 
 // wrapText wraps text to fit within a given width
