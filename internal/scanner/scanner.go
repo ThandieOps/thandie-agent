@@ -9,6 +9,12 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
+// ProgressCallback is called to report progress during scanning
+// current: number of directories processed so far
+// total: total number of directories to process
+// message: status message (e.g., directory name being processed)
+type ProgressCallback func(current, total int, message string)
+
 // ListTopLevelDirs scans a directory and returns top-level directories,
 // respecting the provided scanner configuration
 func ListTopLevelDirs(path string, ignoreDirs []string, includeHidden bool) ([]string, error) {
@@ -152,24 +158,42 @@ type DirectoryInfo struct {
 }
 
 // ScanDirectoriesWithMetadata scans a directory and returns top-level directories
-// with their git metadata, respecting the provided scanner configuration
-func ScanDirectoriesWithMetadata(path string, ignoreDirs []string, includeHidden bool) ([]DirectoryInfo, error) {
+// with their git metadata, respecting the provided scanner configuration.
+// If progressCallback is not nil, it will be called to report progress.
+func ScanDirectoriesWithMetadata(path string, ignoreDirs []string, includeHidden bool, progressCallback ProgressCallback) ([]DirectoryInfo, error) {
 	dirs, err := ListTopLevelDirs(path, ignoreDirs, includeHidden)
 	if err != nil {
 		return nil, err
 	}
 
+	total := len(dirs)
+	if progressCallback != nil {
+		progressCallback(0, total, fmt.Sprintf("Found %d directories to scan", total))
+	}
+
 	infos := make([]DirectoryInfo, len(dirs))
 	for i, dir := range dirs {
+		if progressCallback != nil {
+			dirName := filepath.Base(dir)
+			progressCallback(i, total, fmt.Sprintf("Scanning: %s", dirName))
+		}
+
 		gitMetadata, err := CollectGitMetadata(dir)
 		if err != nil {
 			// If metadata collection fails, still include the directory but without metadata
 			infos[i] = DirectoryInfo{Path: dir}
+			if progressCallback != nil {
+				progressCallback(i+1, total, fmt.Sprintf("Completed: %s (metadata error)", filepath.Base(dir)))
+			}
 			continue
 		}
 		infos[i] = DirectoryInfo{
 			Path:        dir,
 			GitMetadata: gitMetadata,
+		}
+
+		if progressCallback != nil {
+			progressCallback(i+1, total, fmt.Sprintf("Completed: %s", filepath.Base(dir)))
 		}
 	}
 

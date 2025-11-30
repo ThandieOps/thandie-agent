@@ -140,18 +140,11 @@ func initConfig() {
 		fmt.Fprintf(os.Stderr, "Config loaded from Viper directly - Logging.ToFile=%v\n", cfg.Logging.ToFile)
 	}
 
-	// Debug: Print config values to stderr before logger init (for debugging)
-	// This helps verify config is being read correctly
-	if cfg != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG: Config loaded - Logging.ToFile=%v, Logging.Level=%s\n", cfg.Logging.ToFile, cfg.Logging.Level)
-		// Also check what Viper has directly
-		fmt.Fprintf(os.Stderr, "DEBUG: Viper logging.to_file=%v\n", viper.GetBool("logging.to_file"))
-	}
-
 	// Initialize logger from config
+	// Suppress debug output to stdout/stderr - logs will go to file if enabled
 	if cfg != nil {
 		if err := logger.Init(cfg.Logging.Level, cfg.Logging.JSON, cfg.Logging.ToFile); err != nil {
-			// Log error but don't fail - continue with stderr logging
+			// Only show errors to stderr if logging initialization fails
 			logPath, pathErr := logger.GetLogFilePath()
 			if pathErr == nil {
 				fmt.Fprintf(os.Stderr, "ERROR: failed to initialize file logging (log path: %s): %v\n", logPath, err)
@@ -160,15 +153,11 @@ func initConfig() {
 			}
 			logger.Init(cfg.Logging.Level, cfg.Logging.JSON, false) // Fallback to stderr only
 		} else if cfg.Logging.ToFile {
-			// Log successful file logging initialization (only if enabled)
+			// Log successful file logging initialization to log file only
 			logPath, err := logger.GetLogFilePath()
 			if err == nil {
-				fmt.Fprintf(os.Stderr, "INFO: File logging enabled - log path: %s\n", logPath)
-				// Now that logger is initialized, also log it
 				logger.Info("file logging enabled", "path", logPath)
 			}
-		} else {
-			fmt.Fprintf(os.Stderr, "DEBUG: File logging is disabled (to_file=false)\n")
 		}
 	} else {
 		logger.Init("info", false, false) // default: info level, text format, no file

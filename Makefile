@@ -6,6 +6,7 @@ BUILD_DIR=./bin
 CMD_PATH=./cmd/thandie
 WORKSPACE=~/Workspace
 LOG_FILE=~/Library/Caches/thandie/logs/thandie.log
+CONFIG_FILE=~/.config/thandie/config.yml
 CACHE_DIR= ~/Library/Caches/thandie/cache/
 CMD=scan
 
@@ -39,6 +40,9 @@ execute: build
 	@echo "# Executing $(BINARY_NAME)..."
 	$(BUILD_DIR)/$(BINARY_NAME) $(CMD) --workspace $(WORKSPACE)
 
+config:
+	cat $(CONFIG_FILE)
+
 logs:
 	cat $(LOG_FILE)
 	wc -l $(LOG_FILE)
@@ -50,7 +54,8 @@ cache:
 # Clean build artifacts
 clean:
 	@echo "# Cleaning build artifacts..."
-	rm -rvf $(BUILD_DIR)
+	/bin/rm ./thandie
+	/bin/rm -rvf $(BUILD_DIR)
 	@echo "# Clean complete"
 
 # Help target

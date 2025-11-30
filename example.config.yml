@@ -1,0 +1,16 @@
+version: 1
+workspace:
+    default: /Users/Michael.Jenkins/Workspace
+    profiles: []
+scanner:
+    include_hidden: false
+    ignore_dirs:
+        - .git
+        - node_modules
+        - vendor
+        - .idea
+    max_depth: 1
+logging:
+  level: error
+  to_file: true
+  json: false
