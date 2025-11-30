@@ -15,22 +15,23 @@ var scanCmd = &cobra.Command{
 	Long: `Scan the configured workspace directory and display the
 top-level project folders found there.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// workspacePath comes from the root persistent flag
-		if workspacePath == "" {
+		// Resolve workspace path using precedence: flag > env > config > default
+		wsPath := getWorkspacePath()
+		if wsPath == "" {
 			log.Fatal("workspace path is empty; use --workspace or -w to specify it")
 		}
 
-		dirs, err := scanner.ListTopLevelDirs(workspacePath)
+		dirs, err := scanner.ListTopLevelDirs(wsPath)
 		if err != nil {
 			log.Fatalf("failed to scan workspace: %v", err)
 		}
 
 		if len(dirs) == 0 {
-			fmt.Printf("No top-level directories found in %s\n", workspacePath)
+			fmt.Printf("No top-level directories found in %s\n", wsPath)
 			return
 		}
 
-		fmt.Printf("Top-level directories in %s:\n", workspacePath)
+		fmt.Printf("Top-level directories in %s:\n", wsPath)
 		for _, d := range dirs {
 			fmt.Println(" -", d)
 		}
