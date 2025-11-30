@@ -2,15 +2,15 @@ package config
 
 // Config represents the application configuration structure
 type Config struct {
-	Version  int      `mapstructure:"version" yaml:"version"`
+	Version   int             `mapstructure:"version" yaml:"version"`
 	Workspace WorkspaceConfig `mapstructure:"workspace" yaml:"workspace"`
-	Scanner  ScannerConfig    `mapstructure:"scanner" yaml:"scanner"`
-	Logging  LoggingConfig    `mapstructure:"logging" yaml:"logging"`
+	Scanner   ScannerConfig   `mapstructure:"scanner" yaml:"scanner"`
+	Logging   LoggingConfig   `mapstructure:"logging" yaml:"logging"`
 }
 
 // WorkspaceConfig holds workspace-related settings
 type WorkspaceConfig struct {
-	Default  string           `mapstructure:"default" yaml:"default"`
+	Default  string             `mapstructure:"default" yaml:"default"`
 	Profiles []WorkspaceProfile `mapstructure:"profiles" yaml:"profiles"`
 }
 

@@ -5,6 +5,7 @@ BINARY_NAME=thandie
 BUILD_DIR=./bin
 CMD_PATH=./cmd/thandie
 WORKSPACE=~/Workspace
+CMD=scan
 
 # Default target
 .DEFAULT_GOAL := help
@@ -17,7 +18,7 @@ fmt:
 # Run the application
 run:
 	@echo "# Running application..."
-	go run $(CMD_PATH) scan --workspace $(WORKSPACE)
+	go run $(CMD_PATH) $(CMD) --workspace $(WORKSPACE)
 
 # Build the executable
 build: fmt
@@ -29,7 +30,7 @@ build: fmt
 # Execute the built binary
 execute: build
 	@echo "# Executing $(BINARY_NAME)..."
-	$(BUILD_DIR)/$(BINARY_NAME) scan --workspace $(WORKSPACE)
+	$(BUILD_DIR)/$(BINARY_NAME) $(CMD) --workspace $(WORKSPACE)
 
 # Clean build artifacts
 clean:
