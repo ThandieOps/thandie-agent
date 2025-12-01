@@ -1,12 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
-	"github.com/ThandieOps/thandie-agent/internal/cache"
 	"github.com/ThandieOps/thandie-agent/internal/logger"
-	"github.com/ThandieOps/thandie-agent/internal/scanner"
 	"github.com/spf13/cobra"
 )
 
@@ -56,52 +53,13 @@ top-level project folders found there.`,
 			"ignore_dirs", ignoreDirs,
 			"include_hidden", includeHidden)
 
-		// Scan directories with metadata collection
-		dirInfos, err := scanner.ScanDirectoriesWithMetadata(wsPath, ignoreDirs, includeHidden)
-		if err != nil {
-			logger.Error("failed to scan workspace", "error", err, "path", wsPath)
-			os.Exit(1)
-		}
-
-		logger.Info("scan completed", "directories_found", len(dirInfos))
-
-		// Save scan results with metadata to cache
-		cacheInstance, err := cache.New()
-		if err != nil {
-			logger.Warn("failed to initialize cache", "error", err)
-		} else {
-			if err := cacheInstance.SaveScanResultWithMetadata(wsPath, dirInfos); err != nil {
-				logger.Warn("failed to save scan results to cache", "error", err)
-			} else {
-				logger.Info("scan results cached", "count", len(dirInfos), "cache_dir", cacheInstance.GetCacheDir())
-				logger.Debug("scan results cached", "count", len(dirInfos), "cache_dir", cacheInstance.GetCacheDir())
-			}
-		}
-
-		if len(dirInfos) == 0 {
-			fmt.Printf("No top-level directories found in %s\n", wsPath)
-			return
-		}
-
-		fmt.Printf("Top-level directories in %s:\n", wsPath)
-		for _, info := range dirInfos {
-			output := " - " + info.Path
-			if info.GitMetadata != nil && info.GitMetadata.IsGitRepo {
-				output += " [git: " + info.GitMetadata.CurrentBranch
-				if info.GitMetadata.HasUncommitted {
-					output += " *"
-				}
-				output += "]"
-			}
-			fmt.Println(output)
-		}
+		// Use scan TUI by default
+		scanTUIApp := NewScanTUI(wsPath, nil)
+		scanTUIApp.Run()
 	},
 }
 
 func init() {
 	// Attach the `scan` command to the root: thandie scan
 	rootCmd.AddCommand(scanCmd)
-
-	// If you want flags specific to scan, add them here:
-	// scanCmd.Flags().Bool("json", false, "Output results as JSON")
 }

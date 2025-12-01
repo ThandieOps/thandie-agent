@@ -25,8 +25,20 @@ var rootCmd = &cobra.Command{
 	Short: "Thandie monitors local workspaces and syncs their state",
 	Long: `Thandie is a CLI tool for monitoring your local development workspaces
 and syncing their state with a remote service.`,
-	// If you want `thandie` to do something when called with no subcommand,
-	// add a Run: func(cmd, args) {...} here. For now, we'll leave it empty.
+	Run: func(cmd *cobra.Command, args []string) {
+		// Launch TUI when no subcommand is provided
+		wsPath := getWorkspacePath()
+		if wsPath == "" {
+			logger.Error("workspace path is empty", "hint", "use --workspace or -w to specify it")
+			os.Exit(1)
+		}
+
+		tui := NewTUIApp(wsPath)
+		if err := tui.Run(); err != nil {
+			logger.Error("TUI error", "error", err)
+			os.Exit(1)
+		}
+	},
 }
 
 // Execute is called by main.main()
